@@ -4,6 +4,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestForkFlow_Integration tests the complete fork flow
@@ -16,15 +17,14 @@ func TestForkFlow_Integration(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	// Create parent session with claude tool (gets pre-assigned ID)
+	// Create parent session with claude tool
 	parent := NewInstanceWithTool("fork-parent", "/tmp", "claude")
 
-	// Verify parent has pre-assigned session ID
-	if parent.ClaudeSessionID == "" {
-		t.Fatal("Parent should have pre-assigned ClaudeSessionID")
-	}
-	parentID := parent.ClaudeSessionID
-	t.Logf("Parent session ID: %s", parentID)
+	// Simulate detection: manually set ClaudeSessionID (normally detected from files)
+	parentID := "abc-123-def"
+	parent.ClaudeSessionID = parentID
+	parent.ClaudeDetectedAt = time.Now()
+	t.Logf("Parent session ID (simulated detection): %s", parentID)
 
 	// Verify CanFork is true
 	if !parent.CanFork() {
@@ -63,19 +63,25 @@ func TestForkFlow_Integration(t *testing.T) {
 }
 
 // TestMultipleSessionsSameProject tests that multiple sessions in same project
-// get different session IDs
+// can have different detected session IDs
 func TestMultipleSessionsSameProject(t *testing.T) {
 	// Create two sessions in the same project directory
 	session1 := NewInstanceWithTool("test1", "/tmp/same-project", "claude")
 	session2 := NewInstanceWithTool("test2", "/tmp/same-project", "claude")
 
-	// Both should have session IDs
-	if session1.ClaudeSessionID == "" {
-		t.Error("session1 should have ClaudeSessionID")
+	// Initially, neither should have session IDs (detection-based)
+	if session1.ClaudeSessionID != "" {
+		t.Error("session1 should have empty ClaudeSessionID (detection-based)")
 	}
-	if session2.ClaudeSessionID == "" {
-		t.Error("session2 should have ClaudeSessionID")
+	if session2.ClaudeSessionID != "" {
+		t.Error("session2 should have empty ClaudeSessionID (detection-based)")
 	}
+
+	// Simulate detection with different IDs
+	session1.ClaudeSessionID = "abc-123-first"
+	session1.ClaudeDetectedAt = time.Now()
+	session2.ClaudeSessionID = "def-456-second"
+	session2.ClaudeDetectedAt = time.Now()
 
 	// Session IDs should be DIFFERENT
 	if session1.ClaudeSessionID == session2.ClaudeSessionID {
@@ -83,6 +89,6 @@ func TestMultipleSessionsSameProject(t *testing.T) {
 			session1.ClaudeSessionID, session2.ClaudeSessionID)
 	}
 
-	t.Logf("Session 1 ID: %s", session1.ClaudeSessionID)
-	t.Logf("Session 2 ID: %s", session2.ClaudeSessionID)
+	t.Logf("Session 1 ID (detected): %s", session1.ClaudeSessionID)
+	t.Logf("Session 2 ID (detected): %s", session2.ClaudeSessionID)
 }

@@ -1195,7 +1195,7 @@ func (h *Home) createSessionInGroup(name, path, command, groupPath string) tea.C
 		}
 
 		// Determine tool from command for proper session initialization
-		// When tool is "claude", a UUID will be pre-assigned for reliable fork support
+		// When tool is "claude", session ID will be detected from files after start
 		tool := "shell"
 		switch command {
 		case "claude":

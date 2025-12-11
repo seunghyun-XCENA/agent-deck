@@ -172,47 +172,48 @@ func TestInstance_CreateForkedInstance(t *testing.T) {
 	}
 }
 
-// TestNewInstanceWithTool tests that claude sessions get pre-assigned session IDs
+// TestNewInstanceWithTool tests that tools are set correctly without pre-assigned session IDs
 func TestNewInstanceWithTool(t *testing.T) {
-	// Shell tool should not get pre-assigned ID
+	// Shell tool should not have session ID (never will)
 	shellInst := NewInstanceWithTool("shell-test", "/tmp/test", "shell")
 	if shellInst.ClaudeSessionID != "" {
 		t.Errorf("Shell session should not have ClaudeSessionID, got: %s", shellInst.ClaudeSessionID)
 	}
 
-	// Claude tool should get pre-assigned ID
+	// Claude tool should NOT have pre-assigned ID (detection happens later)
 	claudeInst := NewInstanceWithTool("claude-test", "/tmp/test", "claude")
-	if claudeInst.ClaudeSessionID == "" {
-		t.Error("Claude session should have pre-assigned ClaudeSessionID")
+	if claudeInst.ClaudeSessionID != "" {
+		t.Errorf("Claude session should NOT have pre-assigned ClaudeSessionID (detection-based), got: %s", claudeInst.ClaudeSessionID)
 	}
 	if claudeInst.Tool != "claude" {
 		t.Errorf("Tool = %s, want claude", claudeInst.Tool)
 	}
-	// Verify it's a valid UUID format
-	if len(claudeInst.ClaudeSessionID) != 36 {
-		t.Errorf("ClaudeSessionID should be 36 chars (UUID), got %d: %s",
-			len(claudeInst.ClaudeSessionID), claudeInst.ClaudeSessionID)
-	}
-	// Verify ClaudeDetectedAt is set
-	if claudeInst.ClaudeDetectedAt.IsZero() {
-		t.Error("ClaudeDetectedAt should be set for claude sessions")
+	// ClaudeDetectedAt should be zero (detection hasn't happened yet)
+	if !claudeInst.ClaudeDetectedAt.IsZero() {
+		t.Error("ClaudeDetectedAt should be zero until detection happens")
 	}
 }
 
-// TestBuildClaudeCommand tests that --session-id is injected correctly
+// TestBuildClaudeCommand tests that claude command is built with config dir and permissions
 func TestBuildClaudeCommand(t *testing.T) {
 	inst := NewInstanceWithTool("test", "/tmp/test", "claude")
 
 	// Test with simple "claude" command
 	cmd := inst.buildClaudeCommand("claude")
-	if !strings.Contains(cmd, "--session-id") {
-		t.Errorf("Should contain --session-id, got: %s", cmd)
+
+	// Should NOT contain --session-id (removed - detection-based now)
+	if strings.Contains(cmd, "--session-id") {
+		t.Errorf("Should NOT contain --session-id (detection-based), got: %s", cmd)
 	}
-	if !strings.Contains(cmd, inst.ClaudeSessionID) {
-		t.Errorf("Should contain the session ID %s, got: %s", inst.ClaudeSessionID, cmd)
-	}
+
+	// Should contain CLAUDE_CONFIG_DIR
 	if !strings.Contains(cmd, "CLAUDE_CONFIG_DIR=") {
 		t.Errorf("Should contain CLAUDE_CONFIG_DIR, got: %s", cmd)
+	}
+
+	// Should contain dangerously-skip-permissions
+	if !strings.Contains(cmd, "--dangerously-skip-permissions") {
+		t.Errorf("Should contain --dangerously-skip-permissions, got: %s", cmd)
 	}
 
 	// Test with non-claude tool (should not modify)
